@@ -428,7 +428,7 @@ fn mc_internal(
         let t0 = vert_list[TRI_TABLE[cube_idx][i] as usize];
         let t1 = vert_list[TRI_TABLE[cube_idx][i+1] as usize];
         let t2 = vert_list[TRI_TABLE[cube_idx][i+2] as usize];
-        let n = glm::cross(&(t0-t1), &(t0-t2));
+        let n = glm::cross(&(t0-t2), &(t0-t1));
         mesh.indices.extend_from_slice(&[i0+i as u32, i0+1+i as u32, i0+2+i as u32]);
         mesh.vertices.extend_from_slice(&[
             t0.x, t0.y, t0.z, 
@@ -459,7 +459,7 @@ pub fn marching_cubes(c0: (usize, usize, usize), scale: f32, res: f64, isolevel:
     
     let mut mesh = Mesh::new();
 
-    let size = (32, 16, 32);
+    let size = (64, 64, 64);
 
     let perlin = noise::Perlin::new();
 

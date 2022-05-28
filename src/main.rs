@@ -43,6 +43,8 @@ fn offset<T>(n: u32) -> *const c_void {
 // unsafe fn FUNCTION_NAME(ARGUMENT_NAME: &Vec<f32>, ARGUMENT_NAME: &Vec<u32>) -> u32 { } 
 
 fn main() {
+
+
     // Set up the necessary objects to deal with windows and event handling
     let el = glutin::event_loop::EventLoop::new();
     let wb = glutin::window::WindowBuilder::new()
@@ -81,6 +83,7 @@ fn main() {
             gl::Enable(gl::DEPTH_TEST);
             gl::DepthFunc(gl::LESS);
             gl::Enable(gl::CULL_FACE);
+            gl::FrontFace(gl::CW);
             gl::Disable(gl::MULTISAMPLE);
             gl::Enable(gl::BLEND);
             gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
@@ -93,7 +96,7 @@ fn main() {
             println!("GLSL\t: {}", util::get_gl_string(gl::SHADING_LANGUAGE_VERSION));
         }
 
-        let m = mc::marching_cubes((0,0,0), 0.1, 0.1, 0.5);
+        let m = mc::marching_cubes((0,0,0), 0.1, 0.1, 0.3);
         let vertices = m.vertices;
         let indices = m.indices;
         let normals = m.normals;
@@ -244,6 +247,7 @@ fn main() {
         let u_mouse_x = unsafe { sh.get_uniform_location("u_mouse_x") };
         let u_mouse_y = unsafe { sh.get_uniform_location("u_mouse_y") };
         let u_mvp = unsafe { sh.get_uniform_location("u_mvp") };
+        let u_model = unsafe { sh.get_uniform_location("u_model") };
 
         // Just adjust aspect ratio
         // let mvp = glm::scale(&glm::identity(), &glm::vec3(1.0, (SCREEN_W / SCREEN_H) as _, 1.0));
@@ -253,7 +257,7 @@ fn main() {
 
         let perspective_mat: glm::Mat4 = glm::perspective(
             aspect,
-            2.2,       // field of view
+            1.6,       // field of view
             100.0, // near
             0.01   // far
         );
@@ -288,7 +292,7 @@ fn main() {
 
                 *delta = (0.0, 0.0);
             }
-            let view_mat = glm::look_at(&glm::vec3(1.6+2.0*elapsed.cos(),1.0,1.6+2.0*elapsed.sin()), &glm::vec3(1.6,1.0,1.6), &glm::vec3(0.0, 1.0, 0.0));
+            let view_mat = glm::look_at(&glm::vec3(3.2+6.0*elapsed.cos(),3.2,3.2+6.0*elapsed.sin()), &glm::vec3(3.2,3.2,3.2), &glm::vec3(0.0, 1.0, 0.0));
             
             let mvp: glm::TMat4<f32> = perspective_mat * view_mat;
 
@@ -297,6 +301,8 @@ fn main() {
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
                 // Issue the necessary commands to draw your scene here
+                let model_mat: glm::Mat4 = glm::identity();
+                gl::UniformMatrix4fv(u_model, 1, gl::FALSE, model_mat.as_ptr());
                 gl::UniformMatrix4fv(u_mvp, 1, gl::FALSE, mvp.as_ptr());
                 gl::Uniform1f(u_time, elapsed);
                 gl::Uniform1f(u_aspect, SCREEN_W as f32 / SCREEN_H as f32);
