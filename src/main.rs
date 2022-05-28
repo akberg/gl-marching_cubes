@@ -5,6 +5,7 @@ use std::sync::{Mutex, Arc, RwLock};
 
 mod shader;
 mod util;
+mod mc;
 
 use glutin::event::{Event, WindowEvent, DeviceEvent, KeyboardInput, ElementState::{Pressed, Released}, VirtualKeyCode::{self, *}};
 use glutin::event_loop::ControlFlow;
@@ -92,21 +93,170 @@ fn main() {
             println!("GLSL\t: {}", util::get_gl_string(gl::SHADING_LANGUAGE_VERSION));
         }
 
-        // == // Set up your VAO here
-        unsafe {
+        let m = mc::marching_cubes((0,0,0), 0.1, 0.1, 0.5);
+        let vertices = m.vertices;
+        let indices = m.indices;
+        let normals = m.normals;
+        let cube_ic = m.index_count;
+        // eprintln!("vertices: {:?}", vertices);
+        // eprintln!("indices: {:?}", indices);
+        // eprintln!("num tris: {}", cube_ic);
 
-        }
+        //---------------------------------------------------------------------/
+        // Set up screen quad
+        //---------------------------------------------------------------------/
+        let cube_vao = unsafe {
+            let mut vao = 0;
+            gl::GenVertexArrays(1, &mut vao);
+            gl::BindVertexArray(vao);
+
+            let mut ibo = 0;
+            gl::GenBuffers(1, &mut ibo);
+            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ibo);
+            gl::BufferData(
+                gl::ELEMENT_ARRAY_BUFFER,
+                byte_size_of_array(&indices),
+                pointer_to_array(&indices) as *const _,
+                gl::STATIC_DRAW
+            );
+
+            let mut vbo = 0;
+            gl::GenBuffers(1, &mut vbo);
+            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                byte_size_of_array(&vertices),
+                pointer_to_array(&vertices) as *const _,
+                gl::STATIC_DRAW
+            );
+
+            gl::EnableVertexAttribArray(0);
+            gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
+
+            let mut nbo = 0;
+            gl::GenBuffers(1, &mut nbo);
+            gl::BindBuffer(gl::ARRAY_BUFFER, nbo);
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                byte_size_of_array(&normals),
+                pointer_to_array(&normals) as *const _,
+                gl::STATIC_DRAW
+            );
+
+            gl::EnableVertexAttribArray(1);
+            gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
+            vao
+        };
+
+        let vertices = [
+            0.0, 0.0, 0.0,
+            1.0, 0.0, 0.0,
+            1.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 0.0, 1.0,
+            1.0, 0.0, 1.0,
+            1.0, 1.0, 1.0,
+            0.0, 1.0, 1.0,
+        ];
+        let indices = [
+            0, 1, 2,
+            0, 2, 3,
+
+            4, 5, 6,
+            4, 6, 7,
+
+            0, 4, 7,
+            0, 7, 2,
+        ];
+        let normals = [
+            0.0, 0.0, -1.0,
+            0.0, 0.0, -1.0,
+            0.0, 0.0, 1.0,
+            0.0, 0.0, 1.0,
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0,
+            1.0, 0.0, 0.0,
+            1.0, 0.0, 0.0,
+        ];
+        let grid_ic = 3*6;
+        let grid_vao = unsafe {
+            let mut vao = 0;
+            gl::GenVertexArrays(1, &mut vao);
+            gl::BindVertexArray(vao);
+
+            let mut ibo = 0;
+            gl::GenBuffers(1, &mut ibo);
+            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ibo);
+            gl::BufferData(
+                gl::ELEMENT_ARRAY_BUFFER,
+                byte_size_of_array(&indices),
+                pointer_to_array(&indices) as *const _,
+                gl::STATIC_DRAW
+            );
+
+            let mut vbo = 0;
+            gl::GenBuffers(1, &mut vbo);
+            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                byte_size_of_array(&vertices),
+                pointer_to_array(&vertices) as *const _,
+                gl::STATIC_DRAW
+            );
+
+            gl::EnableVertexAttribArray(0);
+            gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
+
+            let mut nbo = 0;
+            gl::GenBuffers(1, &mut nbo);
+            gl::BindBuffer(gl::ARRAY_BUFFER, nbo);
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                byte_size_of_array(&normals),
+                pointer_to_array(&normals) as *const _,
+                gl::STATIC_DRAW
+            );
+
+            gl::EnableVertexAttribArray(1);
+            gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
+            vao
+        };
 
         // Basic usage of shader helper
         // The code below returns a shader object, which contains the field .program_id
         // The snippet is not enough to do the assignment, and will need to be modified (outside of just using the correct path), but it only needs to be called once
         // shader::ShaderBuilder::new().attach_file("./path/to/shader").link();
-        unsafe {
+        let sh = unsafe {
+            shader::ShaderBuilder::new()
+                .attach_file("./shaders/simple.vert")
+                .attach_file("./shaders/simple.frag")
+                .link()
+        };
+        unsafe { sh.activate() };
+        let mut mouse_pos = (0.0, 0.0);
 
-        }
+        let u_time = unsafe { sh.get_uniform_location("u_time") };
 
-        // Used to demonstrate keyboard handling -- feel free to remove
-        let mut _arbitrary_number = 0.0;
+        let u_color = unsafe { sh.get_uniform_location("u_color") };
+        let u_aspect = unsafe { sh.get_uniform_location("u_aspect") };
+        let u_screen_w = unsafe { sh.get_uniform_location("u_screen_w") };
+        let u_screen_h = unsafe { sh.get_uniform_location("u_screen_h") };
+        let u_mouse_x = unsafe { sh.get_uniform_location("u_mouse_x") };
+        let u_mouse_y = unsafe { sh.get_uniform_location("u_mouse_y") };
+        let u_mvp = unsafe { sh.get_uniform_location("u_mvp") };
+
+        // Just adjust aspect ratio
+        // let mvp = glm::scale(&glm::identity(), &glm::vec3(1.0, (SCREEN_W / SCREEN_H) as _, 1.0));
+        let mvp = glm::ortho(0.0f32, SCREEN_W as _, 0.0, SCREEN_H as _, 0.0, 1.0);
+
+        let aspect = SCREEN_W as f32 / SCREEN_H as f32;
+
+        let perspective_mat: glm::Mat4 = glm::perspective(
+            aspect,
+            2.2,       // field of view
+            100.0, // near
+            0.01   // far
+        );
 
         let first_frame_time = std::time::Instant::now();
         let mut last_frame_time = first_frame_time;
@@ -122,10 +272,8 @@ fn main() {
                 for key in keys.iter() {
                     match key {
                         VirtualKeyCode::A => {
-                            _arbitrary_number += delta_time;
                         },
                         VirtualKeyCode::D => {
-                            _arbitrary_number -= delta_time;
                         },
 
 
@@ -140,17 +288,34 @@ fn main() {
 
                 *delta = (0.0, 0.0);
             }
+            let view_mat = glm::look_at(&glm::vec3(1.6+2.0*elapsed.cos(),1.0,1.6+2.0*elapsed.sin()), &glm::vec3(1.6,1.0,1.6), &glm::vec3(0.0, 1.0, 0.0));
+            
+            let mvp: glm::TMat4<f32> = perspective_mat * view_mat;
 
             unsafe {
                 gl::ClearColor(0.163, 0.163, 0.163, 1.0);
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
                 // Issue the necessary commands to draw your scene here
+                gl::UniformMatrix4fv(u_mvp, 1, gl::FALSE, mvp.as_ptr());
+                gl::Uniform1f(u_time, elapsed);
+                gl::Uniform1f(u_aspect, SCREEN_W as f32 / SCREEN_H as f32);
+                gl::Uniform1ui(u_screen_w, SCREEN_W);
+                gl::Uniform1ui(u_screen_h, SCREEN_H);
+                gl::Uniform1f(u_mouse_x, mouse_pos.0);
+                gl::Uniform1f(u_mouse_y, mouse_pos.1);
+                gl::Uniform4f(u_color, 1.0, 0.0, 1.0, 1.0);
 
+                gl::BindVertexArray(cube_vao);
+                gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
+                gl::DrawElements(gl::TRIANGLES, cube_ic, gl::UNSIGNED_INT, std::ptr::null());
 
-
-
-
+                gl::Uniform4f(u_color, 0.0, 0.0, 0.0, 1.0);
+                
+                // gl::BindVertexArray(grid_vao);
+                // //gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
+                // gl::DrawElements(gl::TRIANGLES, grid_ic, gl::UNSIGNED_INT, std::ptr::null());
+                
                 
             }
 
