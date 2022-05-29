@@ -305,18 +305,131 @@ fn vertex_interp(
     val2: f64
 ) -> glm::Vec3 {
     //eprintln!("interpolate {:?} and {:?}: {:?}", p1, p2, (p1+p2)/2.0);
-    (p1 + p2) / 2.0
+    ((p1 + p2) / 2.0).component_mul(&glm::vec3(1.0, 1.0, 1.0))
 }
 
+#[derive(Default)]
 pub struct Mesh {
     pub vertices: Vec<f32>,
-    pub indices: Vec<u32>,
     pub normals: Vec<f32>,
+    pub texture_coordinates: Vec<f32>,
+    pub colors: Vec<f32>,
+    pub indices: Vec<u32>,
     pub index_count: i32,
 }
 impl Mesh {
     pub fn new() -> Self { 
-        Mesh { vertices: Vec::new(), indices: Vec::new(), normals: Vec::new(), index_count: 0 }
+        Mesh { ..Default::default() }
+    }
+    pub fn cube(
+        scale: glm::TVec3<f32>,
+        texture_scale: glm::TVec2<f32>,
+        tiling_textures: bool,
+        inverted: bool,
+        texture_scale3d: glm::TVec3<f32>,
+        color: glm::TVec4<f32>
+    ) -> Self {
+        let mut points = [glm::vec3(0.0, 0.0, 0.0); 8];
+        let mut indices = vec![0; 36];
+
+        for y in 0..2 {
+            for z in 0..2 {
+                for x in 0..2 {
+                    points[x+y*4+z*2] = glm::vec3(
+                        x as f32 * 2.0 - 1.0, 
+                        y as f32 * 2.0 - 1.0, 
+                        z as f32 * 2.0 - 1.0,
+                    ).component_mul(&scale) * 0.5;
+                }
+            }
+        }
+
+        let faces = [
+            [2,3,0,1], // Bottom 
+            [4,5,6,7], // Top 
+            [7,5,3,1], // Right 
+            [4,6,0,2], // Left 
+            [5,4,1,0], // Back 
+            [6,7,2,3], // Front 
+        ];
+
+        let scale = scale.component_mul(&texture_scale3d);
+        let face_scale = [
+            glm::vec2(-scale.x,-scale.z), // Bottom
+            glm::vec2(-scale.x,-scale.z), // Top
+            glm::vec2( scale.z, scale.y), // Right
+            glm::vec2( scale.z, scale.y), // Left
+            glm::vec2( scale.x, scale.y), // Back
+            glm::vec2( scale.x, scale.y), // Front
+        ];
+
+        let normals = [
+            glm::vec3( 0.0,-1.0, 0.0), // Bottom 
+            glm::vec3( 0.0, 1.0, 0.0), // Top 
+            glm::vec3( 1.0, 0.0, 0.0), // Right 
+            glm::vec3(-1.0, 0.0, 0.0), // Left 
+            glm::vec3( 0.0, 0.0,-1.0), // Back 
+            glm::vec3( 0.0, 0.0, 1.0), // Front 
+        ];
+
+        let uvs = [
+            glm::vec2(0.0, 0.0),
+            glm::vec2(0.0, 1.0),
+            glm::vec2(1.0, 0.0),
+            glm::vec2(1.0, 1.0),
+        ];
+        let mut vertices = Vec::new();
+        let mut mindices = Vec::new();
+        let mut mnormals = Vec::new();
+        let mut texture_coordinates = Vec::new();
+        for face in 0..6 {
+            let offset = face * 6;
+            indices[offset + 0] = faces[face][0] as u32;
+            indices[offset + 3] = faces[face][0] as u32;
+
+            if !inverted {
+                indices[offset + 1] = faces[face][3] as u32;
+                indices[offset + 2] = faces[face][1] as u32;
+                indices[offset + 4] = faces[face][2] as u32;
+                indices[offset + 5] = faces[face][3] as u32;
+            } else {
+                indices[offset + 1] = faces[face][1] as u32;
+                indices[offset + 2] = faces[face][3] as u32;
+                indices[offset + 4] = faces[face][3] as u32;
+                indices[offset + 5] = faces[face][2] as u32;
+            }
+
+            for i in 0..6 {
+                vertices.push(points[indices[offset + i] as usize]);
+                mindices.push((offset + i) as u32);
+                mnormals.push(normals[face] * (if inverted{-1.0}else{1.0}));
+            }
+
+            let texture_scale_factor =  if tiling_textures {
+                face_scale[face].component_div(&texture_scale)
+            } else {
+                glm::vec2(1.0, 1.0)
+            };
+
+            if inverted {
+                for &i in [1,2,3,1,0,2].iter() {
+                    texture_coordinates.push(uvs[i].component_mul(&texture_scale_factor));
+                }
+            } else {
+                for &i in [3,1,0,3,0,2].iter() {
+                    texture_coordinates.push(uvs[i].component_mul(&texture_scale_factor));
+                }
+            }
+        }
+        let vertex_count = vertices.len();
+        Mesh {
+            vertices: crate::util::from_array_of_vec3(vertices),
+            indices: mindices,
+            normals: crate::util::from_array_of_vec3(mnormals),
+            texture_coordinates: crate::util::from_array_of_vec2(texture_coordinates),
+            index_count: 36,
+            ..Default::default()
+        }
     }
 }
 
@@ -419,7 +532,7 @@ fn mc_internal(
             isolevel,p[3],p[7],val[3],val[7]
         );
     }
-    //eprintln!("vert list: {:?}", vert_list);
+    eprintln!("vert list: {:?}", vert_list);
 
     /* Look-up triangles */
     let i0 = mesh.indices.len() as u32;
@@ -428,7 +541,7 @@ fn mc_internal(
         let t0 = vert_list[TRI_TABLE[cube_idx][i] as usize];
         let t1 = vert_list[TRI_TABLE[cube_idx][i+1] as usize];
         let t2 = vert_list[TRI_TABLE[cube_idx][i+2] as usize];
-        let n = glm::cross(&(t0-t2), &(t0-t1));
+        let n = glm::cross(&(t0-t1), &(t0-t2));
         mesh.indices.extend_from_slice(&[i0+i as u32, i0+1+i as u32, i0+2+i as u32]);
         mesh.vertices.extend_from_slice(&[
             t0.x, t0.y, t0.z, 
@@ -446,12 +559,40 @@ fn mc_internal(
 
 pub fn mc_test() -> Mesh {
     let mut m = Mesh::new();
+    // let grid = [
+    //     [[1.0, 1.0, 1.0], [0.0, 1.0, 1.0], [0.0, 1.0, 1.0]],
+    //     [[1.0, 0.0, 1.0], [0.0, 0.0, 0.0], [1.0, 0.0, 1.0]],
+    //     [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]],
+    // ];
+    let grid = [
+        [[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.0]],
+        [[0.0, 1.0, 0.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+        [[0.0, 1.0, 0.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+    ];
 
-    let val = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0];
-    mc_internal(glm::vec3(0.0,0.0,0.0), val, 1.0, 1.0, 0.5, &mut m);
+    for i in 0..2 {
+        for j in 0..2 {
+            for k in 0..2 {
+                let val = [
+                    grid[i][j][k],
+                    grid[i][j+1][k],
+                    grid[i+1][j+1][k],
+                    grid[i+1][j][k],
+                    grid[i][j][k+1],
+                    grid[i][j+1][k+1],
+                    grid[i+1][j+1][k+1],
+                    grid[i+1][j][k+1],
+                ];
+                mc_internal(glm::vec3(i as f32, j as f32, k as f32), val, 1.0, 1.0, 0.5, &mut m);
+            }
+        }
+    }
 
-    let val = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0];
-    mc_internal(glm::vec3(0.0,1.0,0.0), val, 1.0, 1.0, 0.5, &mut m);
+    // let val = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0];
+    // mc_internal(glm::vec3(0.0,0.0,0.0), val, 1.0, 1.0, 0.5, &mut m);
+
+    // let val = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0];
+    // mc_internal(glm::vec3(0.0,1.0,0.0), val, 1.0, 1.0, 0.5, &mut m);
     m
 }
 
@@ -459,7 +600,7 @@ pub fn marching_cubes(c0: (usize, usize, usize), scale: f32, res: f64, isolevel:
     
     let mut mesh = Mesh::new();
 
-    let size = (64, 64, 64);
+    let size = (16,16,16);
 
     let perlin = noise::Perlin::new();
 
@@ -467,7 +608,7 @@ pub fn marching_cubes(c0: (usize, usize, usize), scale: f32, res: f64, isolevel:
         for j in c0.1..c0.1+size.1 {
             for k in c0.2..c0.2+size.2 {
                 let cell = glm::vec3(i as f32,j as f32,k as f32) * scale;
-                // eprintln!("{:?}", cell);
+                eprintln!("cell: {:?}", cell);
                 let (i,j,k) = (i as f64 * res, j as f64 * res, k as f64 * res);
                 /* Compute point values */
                 let val = if k > 0.0 {[
@@ -481,7 +622,7 @@ pub fn marching_cubes(c0: (usize, usize, usize), scale: f32, res: f64, isolevel:
                     perlin.get([i+res,j+res,k+res]),
                     perlin.get([i+res,j,k+res]),
                 ]} else { [1.0;8] };
-                // eprintln!("{:?}", val);
+                eprintln!("val: {:?}", val);
                 /* MC step */
                 mc_internal(
                     cell,
