@@ -43,7 +43,18 @@ fn offset<T>(n: u32) -> *const c_void {
 // unsafe fn FUNCTION_NAME(ARGUMENT_NAME: &Vec<f32>, ARGUMENT_NAME: &Vec<u32>) -> u32 { } 
 
 fn main() {
-
+    // use noise::{NoiseFn, Perlin};
+    // let perlin = Perlin::new();
+    // let nfreq = 0.2;
+    // println!("128 128 128");
+    // (0..128).for_each(|i|{
+    //     (0..128).for_each(|j|{
+    //         (0..128).for_each(|k|{
+    //             print!("{:.4} ", (perlin.get([i as f64 * nfreq, j as f64 * nfreq, k as f64 * nfreq]) + 1.0) / 2.0)}
+    //         );}
+    //     );}
+    // );
+    // return;
 
     // Set up the necessary objects to deal with windows and event handling
     let el = glutin::event_loop::EventLoop::new();
@@ -91,12 +102,32 @@ fn main() {
             gl::DebugMessageCallback(Some(util::debug_callback), ptr::null());
 
             // Print some diagnostics
-            println!("{}: {}", util::get_gl_string(gl::VENDOR), util::get_gl_string(gl::RENDERER));
-            println!("OpenGL\t: {}", util::get_gl_string(gl::VERSION));
-            println!("GLSL\t: {}", util::get_gl_string(gl::SHADING_LANGUAGE_VERSION));
+            eprintln!("{}: {}", util::get_gl_string(gl::VENDOR), util::get_gl_string(gl::RENDERER));
+            eprintln!("OpenGL\t: {}", util::get_gl_string(gl::VERSION));
+            eprintln!("GLSL\t: {}", util::get_gl_string(gl::SHADING_LANGUAGE_VERSION));
         }
 
-        let m = mc::marching_cubes((0,0,0), 1.0, 0.2, 0.4);
+        use std::io::{prelude::*, BufReader};
+        use std::fs::File;
+        let f = File::open("./points.txt").unwrap();
+        let mut f = BufReader::new(f);
+        let mut bd = String::new();
+        let _ = f.read_line(&mut bd);
+        let bd = bd.trim().split_ascii_whitespace().map(|s| s.parse::<usize>().unwrap()).collect::<Vec<_>>();
+        let mut f = f.split(b' ');
+        let f = f.map(|b| std::str::from_utf8(&b.unwrap()).unwrap().parse::<f64>().unwrap()).collect::<Vec<_>>();
+        eprintln!("Loaded {}/{} points", f.len(), bd[0]*bd[1]*bd[2]);
+        println!("{} {} {} {}", f[0], f[1], f[2], f[3]);
+        let points = (0..bd[0]).map(|i|
+            (0..bd[1]).map(|j|
+                (0..bd[2]).map(|k| 
+                    f[i*bd[1]*bd[2]+j*bd[1]+k]
+                    //std::str::from_utf8(&f.next().unwrap().unwrap()).unwrap().parse::<f64>().unwrap()
+                    //(perlin.get([i as f64 * nfreq, j as f64 * nfreq, k as f64 * nfreq]) + 1.0) / 2.0
+                ).collect::<Vec<_>>()
+            ).collect::<Vec<_>>()
+        ).collect::<Vec<_>>();
+        let m = mc::marching_cubes((0,0,0), 1.0, &points, 0.4);
         //let m = mc::mc_test();
         let vertices = m.vertices;
         let indices = m.indices;

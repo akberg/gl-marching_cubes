@@ -438,13 +438,11 @@ fn mc_internal(
     cell: glm::TVec3<f32>, 
     val: [f64; 8],
     scale: f32, 
-    res: f64, 
     isolevel: f64, 
     mesh: &mut Mesh
 ) {
 
     let mut vert_list = vec![glm::zero();12];
-    let (i,j,k) = (cell.x as f64 * res, cell.y as f64 * res, cell.z as f64 * res);
 
     let p = [
         cell + glm::vec3(0.0,0.0,0.0) * scale,
@@ -459,6 +457,7 @@ fn mc_internal(
 
     
     /* Compute index */
+    // TODO: Let external function decide cmp with isolevel (or just have them invert the isolevel?)
     let cube_idx = (
           ((val[0] > isolevel) as u8) << 0
         | ((val[1] > isolevel) as u8) << 1
@@ -532,7 +531,7 @@ fn mc_internal(
             isolevel,p[3],p[7],val[3],val[7]
         );
     }
-    eprintln!("vert list: {:?}", vert_list);
+    //eprintln!("vert list: {:?}", vert_list);
 
     /* Look-up triangles */
     let i0 = mesh.indices.len() as u32;
@@ -583,7 +582,7 @@ pub fn mc_test() -> Mesh {
                     grid[i+1][j+1][k+1],
                     grid[i+1][j][k+1],
                 ];
-                mc_internal(glm::vec3(i as f32, j as f32, k as f32), val, 1.0, 1.0, 0.5, &mut m);
+                mc_internal(glm::vec3(i as f32, j as f32, k as f32), val, 1.0, 0.5, &mut m);
             }
         }
     }
@@ -596,11 +595,13 @@ pub fn mc_test() -> Mesh {
     m
 }
 
-pub fn marching_cubes(c0: (usize, usize, usize), scale: f32, res: f64, isolevel: f64) -> Mesh {
+/// Marching cubes with vertices duplicated: Simplicity of implementation and 
+/// flat shading. Starts at voxel coordinates c0 
+pub fn marching_cubes(c0: (usize, usize, usize), scale: f32, points: &Vec<Vec<Vec<f64>>>, isolevel: f64) -> Mesh {
     
     let mut mesh = Mesh::new();
 
-    let size = (16,16,16);
+    let size = (64, 64, 64);
 
     let perlin = noise::Perlin::new();
 
@@ -608,27 +609,25 @@ pub fn marching_cubes(c0: (usize, usize, usize), scale: f32, res: f64, isolevel:
         for j in c0.1..c0.1+size.1 {
             for k in c0.2..c0.2+size.2 {
                 let cell = glm::vec3(i as f32,j as f32,k as f32) * scale;
-                eprintln!("cell: {:?}", cell);
-                let (i,j,k) = (i as f64 * res, j as f64 * res, k as f64 * res);
+                //eprintln!("cell: {:?}", cell);
+                //let (i,j,k) = (i as f64 * res, j as f64 * res, k as f64 * res);
                 /* Compute point values */
-                let val = if k > 0.0 {[
-                    perlin.get([i,j,k]),
-                    perlin.get([i,j+res,k]),
-                    perlin.get([i+res,j+res,k]),
-                    perlin.get([i+res,j,k]),
-
-                    perlin.get([i,j,k+res]),
-                    perlin.get([i,j+res,k+res]),
-                    perlin.get([i+res,j+res,k+res]),
-                    perlin.get([i+res,j,k+res]),
+                let val = if k > 0 {[
+                    points[i][j][k],
+                    points[i][j+1][k],
+                    points[i+1][j+1][k],
+                    points[i+1][j][k],
+                    points[i][j][k+1],
+                    points[i][j+1][k+1],
+                    points[i+1][j+1][k+1],
+                    points[i+1][j][k+1],
                 ]} else { [1.0;8] };
-                eprintln!("val: {:?}", val);
+                //eprintln!("val: {:?}", val);
                 /* MC step */
                 mc_internal(
                     cell,
                     val,
                     scale,
-                    res,
                     isolevel,
                     &mut mesh,
                 );
