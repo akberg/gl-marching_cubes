@@ -2,6 +2,8 @@
 
 use noise::{self, NoiseFn};
 use glm;
+
+// Edge and tri table from http://paulbourke.net/geometry/polygonise/
 #[allow(unused)]
 const EDGE_TABLE: [u32;256]= [
     0x0  , 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
@@ -304,8 +306,16 @@ fn vertex_interp(
     val1: f64, 
     val2: f64
 ) -> glm::Vec3 {
+    let eps = 0.00001;
     //eprintln!("interpolate {:?} and {:?}: {:?}", p1, p2, (p1+p2)/2.0);
-    ((p1 + p2) / 2.0).component_mul(&glm::vec3(1.0, 1.0, 1.0))
+    // TODO: Interpolate according to difference in values
+    //(p1 + p2) / 2.0
+    if (isolevel-val1).abs() < eps { return p1 }
+    if (isolevel-val2).abs() < eps { return p2 }
+    if (val1-val2).abs() < eps { return p1 }
+
+    let mu = (isolevel - val1) / (val2 - val1);
+    p1 + mu as f32 * (p2 - p1)
 }
 
 #[derive(Default)]
@@ -459,14 +469,14 @@ fn mc_internal(
     /* Compute index */
     // TODO: Let external function decide cmp with isolevel (or just have them invert the isolevel?)
     let cube_idx = (
-          ((val[0] > isolevel) as u8) << 0
-        | ((val[1] > isolevel) as u8) << 1
-        | ((val[2] > isolevel) as u8) << 2
-        | ((val[3] > isolevel) as u8) << 3
-        | ((val[4] > isolevel) as u8) << 4
-        | ((val[5] > isolevel) as u8) << 5
-        | ((val[6] > isolevel) as u8) << 6
-        | ((val[7] > isolevel) as u8) << 7
+          ((val[0] < isolevel) as u8) << 0
+        | ((val[1] < isolevel) as u8) << 1
+        | ((val[2] < isolevel) as u8) << 2
+        | ((val[3] < isolevel) as u8) << 3
+        | ((val[4] < isolevel) as u8) << 4
+        | ((val[5] < isolevel) as u8) << 5
+        | ((val[6] < isolevel) as u8) << 6
+        | ((val[7] < isolevel) as u8) << 7
     ) as usize;
     //eprintln!("cube idx: {:08b}", cube_idx);
     //eprintln!("edge table: {:08b}", EDGE_TABLE[cube_idx]);
@@ -601,7 +611,7 @@ pub fn marching_cubes(c0: (usize, usize, usize), scale: f32, points: &Vec<Vec<Ve
     
     let mut mesh = Mesh::new();
 
-    let size = (64, 64, 64);
+    let size = (16, 16, 16);
 
     let perlin = noise::Perlin::new();
 

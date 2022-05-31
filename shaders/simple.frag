@@ -22,7 +22,7 @@ void main()
     float diffuse = max(dot(normalize(normal), normalize(light_dir)), 0.0);
     if (!gl_FrontFacing) {
         diffuse = (1.0 - diffuse);
-        col.xyz = vec3(0.0, 0.0, 0.5);
+        col.xyz = vec3(0.0, 0.0, 0.8);
     }
     color = vec4(col.xyz * 0.2 + col.xyz * diffuse, 1.0); //vec4(1.0f, 0.0f, 1.0f, 1.0f);
 }

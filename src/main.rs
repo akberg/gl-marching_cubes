@@ -43,18 +43,25 @@ fn offset<T>(n: u32) -> *const c_void {
 // unsafe fn FUNCTION_NAME(ARGUMENT_NAME: &Vec<f32>, ARGUMENT_NAME: &Vec<u32>) -> u32 { } 
 
 fn main() {
-    // use noise::{NoiseFn, Perlin};
-    // let perlin = Perlin::new();
-    // let nfreq = 0.2;
-    // println!("128 128 128");
-    // (0..128).for_each(|i|{
-    //     (0..128).for_each(|j|{
-    //         (0..128).for_each(|k|{
-    //             print!("{:.4} ", (perlin.get([i as f64 * nfreq, j as f64 * nfreq, k as f64 * nfreq]) + 1.0) / 2.0)}
-    //         );}
-    //     );}
-    // );
-    // return;
+    let args = std::env::args().collect::<Vec<_>>();
+    if args.get(1) == Some(&String::from("-g")) {
+        use noise::{NoiseFn, Perlin};
+        use std::io::Write;
+        let perlin = Perlin::new();
+        let nfreq = 0.2;
+        let mut f = std::fs::File::open("./points.txt").unwrap();
+        
+        writeln!(f, "129 129 129");
+        (0..129).for_each(|i|{
+            (0..129).for_each(|j|{
+                (0..129).for_each(|k|{
+                    write!(f, "{:.4} ", (perlin.get([i as f64 * nfreq, j as f64 * nfreq, k as f64 * nfreq]) + 1.0) / 2.0);}
+                );}
+            );}
+        );
+        return;
+
+    }
 
     // Set up the necessary objects to deal with windows and event handling
     let el = glutin::event_loop::EventLoop::new();
@@ -120,77 +127,86 @@ fn main() {
         println!("{} {} {} {}", f[0], f[1], f[2], f[3]);
         let points = (0..bd[0]).map(|i|
             (0..bd[1]).map(|j|
-                (0..bd[2]).map(|k| 
+                (0..bd[2]).map(|k|
                     f[i*bd[1]*bd[2]+j*bd[1]+k]
                     //std::str::from_utf8(&f.next().unwrap().unwrap()).unwrap().parse::<f64>().unwrap()
                     //(perlin.get([i as f64 * nfreq, j as f64 * nfreq, k as f64 * nfreq]) + 1.0) / 2.0
                 ).collect::<Vec<_>>()
             ).collect::<Vec<_>>()
         ).collect::<Vec<_>>();
-        let m = mc::marching_cubes((0,0,0), 1.0, &points, 0.4);
+
+        use rayon::prelude::*;
+        let s = 8;
+        let chunks = (0..s*s*s).map(|i|{
+            eprintln!("MC on chunk ({},{},{})",(i as usize/ (s*s))*16,((i as usize/s)%s)*16,(i as usize%s)*16);
+            mc::marching_cubes(((i as usize/ (s*s))*16,((i as usize/s)%s)*16,(i as usize%s)*16), 0.5, &points, 0.4)
+        }).collect::<Vec<_>>();
+        let chunks = chunks.into_iter().map(|m| {
+
+            let vertices = m.vertices;
+            let indices = m.indices;
+            let normals = m.normals;
+            let cube_ic = m.index_count;
+    
+            //---------------------------------------------------------------------/
+            // Set up VAO
+            //---------------------------------------------------------------------/
+            unsafe {
+                let mut vao = 0;
+                gl::GenVertexArrays(1, &mut vao);
+                gl::BindVertexArray(vao);
+    
+                let mut ibo = 0;
+                gl::GenBuffers(1, &mut ibo);
+                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ibo);
+                gl::BufferData(
+                    gl::ELEMENT_ARRAY_BUFFER,
+                    byte_size_of_array(&indices),
+                    pointer_to_array(&indices) as *const _,
+                    gl::STATIC_DRAW
+                );
+    
+                let mut vbo = 0;
+                gl::GenBuffers(1, &mut vbo);
+                gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+                gl::BufferData(
+                    gl::ARRAY_BUFFER,
+                    byte_size_of_array(&vertices),
+                    pointer_to_array(&vertices) as *const _,
+                    gl::STATIC_DRAW
+                );
+    
+                gl::EnableVertexAttribArray(0);
+                gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
+    
+                let mut nbo = 0;
+                gl::GenBuffers(1, &mut nbo);
+                gl::BindBuffer(gl::ARRAY_BUFFER, nbo);
+                gl::BufferData(
+                    gl::ARRAY_BUFFER,
+                    byte_size_of_array(&normals),
+                    pointer_to_array(&normals) as *const _,
+                    gl::STATIC_DRAW
+                );
+    
+                gl::EnableVertexAttribArray(1);
+                gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
+                (vao, m.index_count)
+            }
+        }).collect::<Vec<_>>();
+        eprintln!("VAOS: {:?}", chunks);
+
+        
         //let m = mc::mc_test();
-        let vertices = m.vertices;
-        let indices = m.indices;
-        let normals = m.normals;
-        let cube_ic = m.index_count;
-        // eprintln!("vertices: {:?}", vertices);
-        // eprintln!("indices: {:?}", indices);
-        // eprintln!("num tris: {}", cube_ic);
-
-        //---------------------------------------------------------------------/
-        // Set up screen quad
-        //---------------------------------------------------------------------/
-        let cube_vao = unsafe {
-            let mut vao = 0;
-            gl::GenVertexArrays(1, &mut vao);
-            gl::BindVertexArray(vao);
-
-            let mut ibo = 0;
-            gl::GenBuffers(1, &mut ibo);
-            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ibo);
-            gl::BufferData(
-                gl::ELEMENT_ARRAY_BUFFER,
-                byte_size_of_array(&indices),
-                pointer_to_array(&indices) as *const _,
-                gl::STATIC_DRAW
-            );
-
-            let mut vbo = 0;
-            gl::GenBuffers(1, &mut vbo);
-            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-            gl::BufferData(
-                gl::ARRAY_BUFFER,
-                byte_size_of_array(&vertices),
-                pointer_to_array(&vertices) as *const _,
-                gl::STATIC_DRAW
-            );
-
-            gl::EnableVertexAttribArray(0);
-            gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
-
-            let mut nbo = 0;
-            gl::GenBuffers(1, &mut nbo);
-            gl::BindBuffer(gl::ARRAY_BUFFER, nbo);
-            gl::BufferData(
-                gl::ARRAY_BUFFER,
-                byte_size_of_array(&normals),
-                pointer_to_array(&normals) as *const _,
-                gl::STATIC_DRAW
-            );
-
-            gl::EnableVertexAttribArray(1);
-            gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
-            vao
-        };
 
         
         let mut grid_vao = Vec::new();
         let mut grid_model_mat = Vec::new();
         let grid_ic = 36;
-        for i in 0..16 {
-            for j in 0..16 {
-                for k in 0..16 {
-                    let m = mc::Mesh::cube(glm::vec3(1.0,1.0,1.0), glm::vec2(1.0,1.0), true, false, glm::vec3(1.0,1.0,1.0), glm::vec4(0.0, 0.0, 0.0, 1.0));
+        for i in 0..4 {
+            for j in 0..4 {
+                for k in 0..4 {
+                    let m = mc::Mesh::cube(glm::vec3(16.0,16.0,16.0), glm::vec2(1.0,1.0), true, false, glm::vec3(1.0,1.0,1.0), glm::vec4(0.0, 0.0, 0.0, 1.0));
                     let vertices = m.vertices;
                     let indices = m.indices;
                     let normals = m.normals;
@@ -240,7 +256,7 @@ fn main() {
                     grid_model_mat.push(
                         glm::translate(
                             &glm::identity::<f32,_>(), 
-                            &glm::vec3(0.5+i as f32, 0.5+j as f32, 0.5+k as f32)
+                            &glm::vec3(8.0+16.0*i as f32, 8.0+16.0*j as f32, 8.0+16.0*k as f32)
                         )
                     );
 
@@ -281,9 +297,9 @@ fn main() {
 
         let perspective_mat: glm::Mat4 = glm::perspective(
             aspect,
-            1.6,       // field of view
-            0.01, // near
-            100.0   // far
+            1.8,       // field of view
+            0.1, // near
+            500.0   // far
         );
 
         let first_frame_time = std::time::Instant::now();
@@ -316,8 +332,8 @@ fn main() {
 
                 *delta = (0.0, 0.0);
             }
-            let mid = 8.0f32;
-            let view_mat = glm::look_at(&glm::vec3(mid+(mid.powi(2)*4.0).sqrt()*elapsed.cos(),mid,mid+(mid.powi(2)*4.0).sqrt()*elapsed.sin()), &glm::vec3(mid,mid,mid), &glm::vec3(0.0, 1.0, 0.0));
+            let mid = 32.0f32;
+            let view_mat = glm::look_at(&glm::vec3(mid+mid*2.0*elapsed.cos(),mid*2.5,mid+mid*2.0*elapsed.sin()), &glm::vec3(mid,mid,mid), &glm::vec3(0.0, 1.0, 0.0));
             
             let mvp: glm::TMat4<f32> = perspective_mat * view_mat;
 
@@ -336,23 +352,26 @@ fn main() {
                 gl::Uniform1ui(u_screen_h, SCREEN_H);
                 gl::Uniform1f(u_mouse_x, mouse_pos.0);
                 gl::Uniform1f(u_mouse_y, mouse_pos.1);
-                gl::Uniform4f(u_color, 1.0, 0.0, 1.0, 1.0);
                 
-                gl::BindVertexArray(cube_vao);
                 gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
                 gl::Disable(gl::CULL_FACE);
-                gl::DrawElements(gl::TRIANGLES, cube_ic, gl::UNSIGNED_INT, std::ptr::null());
+                for (vao, ic) in chunks.iter() {
+                    
+                    gl::Uniform4f(u_color, 1.0, 0.0, 1.0, 1.0);
+                    gl::BindVertexArray(*vao);
+                    gl::DrawElements(gl::TRIANGLES, *ic, gl::UNSIGNED_INT, std::ptr::null());
+                }
 
                 gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
-                // for (vao, model) in grid_vao.iter().zip(&grid_model_mat) {
-                //     let mvp = mvp * model;
-                //     gl::UniformMatrix4fv(u_mvp, 1, gl::FALSE, mvp.as_ptr());
-                //     gl::Uniform4f(u_color, 0.0, 0.0, 0.0, 0.5);
+                for (vao, model) in grid_vao.iter().zip(&grid_model_mat) {
+                    let mvp = mvp * model;
+                    gl::UniformMatrix4fv(u_mvp, 1, gl::FALSE, mvp.as_ptr());
+                    gl::Uniform4f(u_color, 0.0, 0.0, 0.0, 0.5);
                     
-                //     gl::BindVertexArray(*vao);
-                //     gl::DrawElements(gl::TRIANGLES, grid_ic, gl::UNSIGNED_INT, std::ptr::null());
+                    gl::BindVertexArray(*vao);
+                    gl::DrawElements(gl::TRIANGLES, grid_ic, gl::UNSIGNED_INT, std::ptr::null());
                     
-                // }
+                }
                 gl::Enable(gl::CULL_FACE);
                 
                 
