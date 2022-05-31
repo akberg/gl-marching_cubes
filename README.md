@@ -2,7 +2,6 @@
 
 Experimenting with the marching cubes algorithm.
 
-![Result](./images/chunk16-correct.png)
+![Result](./images/chunk72-frontback_shaded.png)
 
-## TODO
-* Precompute values and send to mc algorithm
+![Result](./images/chunk128.png)
