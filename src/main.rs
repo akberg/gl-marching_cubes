@@ -43,13 +43,13 @@ fn offset<T>(n: u32) -> *const c_void {
 // unsafe fn FUNCTION_NAME(ARGUMENT_NAME: &Vec<f32>, ARGUMENT_NAME: &Vec<u32>) -> u32 { } 
 
 fn main() {
-    let args = std::env::args().collect::<Vec<_>>();
-    if args.get(1) == Some(&String::from("-g")) {
+    if !std::path::Path::new("./points.txt").exists() {
+        eprint!("File points.txt not found. Generating point cloud . . . ");
         use noise::{NoiseFn, Perlin};
         use std::io::Write;
         let perlin = Perlin::new();
         let nfreq = 0.2;
-        let mut f = std::fs::File::open("./points.txt").unwrap();
+        let mut f = std::fs::File::create("./points.txt").unwrap();
         
         writeln!(f, "129 129 129");
         (0..129).for_each(|i|{
@@ -59,14 +59,13 @@ fn main() {
                 );}
             );}
         );
-        return;
-
+        eprintln!("done.")
     }
 
     // Set up the necessary objects to deal with windows and event handling
     let el = glutin::event_loop::EventLoop::new();
     let wb = glutin::window::WindowBuilder::new()
-        .with_title("Gloom-rs")
+        .with_title("Marching Cubes")
         .with_resizable(false)
         .with_inner_size(glutin::dpi::LogicalSize::new(SCREEN_W, SCREEN_H));
     let cb = glutin::ContextBuilder::new()
