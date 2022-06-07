@@ -1,8 +1,8 @@
 [package]
-name = "gloom-rs"
+name = "gl-marching_cubes"
 version = "0.1.0"
-authors = ["Michael H. Gimle <michael.gimle@gmail.com>"]
-edition = "2018"
+authors = ["Andreas Klavenes Berg <andreaskb98@gmail.com>"]
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
