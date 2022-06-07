@@ -254,7 +254,7 @@ fn main() {
                     grid_vao.push(vao);
                     grid_model_mat.push(
                         glm::translate(
-                            &glm::identity::<f32,_>(), 
+                            &glm::identity(), 
                             &glm::vec3(8.0+16.0*i as f32, 8.0+16.0*j as f32, 8.0+16.0*k as f32)
                         )
                     );
