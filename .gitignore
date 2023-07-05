@@ -1,3 +1,4 @@
 /target
 /.vscode
 points.txt
+Cargo.lock
