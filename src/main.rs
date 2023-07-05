@@ -40,7 +40,7 @@ fn offset<T>(n: u32) -> *const c_void {
 
 
 // == // Modify and complete the function below for the first task
-// unsafe fn FUNCTION_NAME(ARGUMENT_NAME: &Vec<f32>, ARGUMENT_NAME: &Vec<u32>) -> u32 { } 
+// unsafe fn FUNCTION_NAME(ARGUMENT_NAME: &Vec<f32>, ARGUMENT_NAME: &Vec<u32>) -> u32 { }
 
 fn main() {
     if !std::path::Path::new("./points.txt").exists() {
@@ -50,7 +50,7 @@ fn main() {
         let perlin = Perlin::new();
         let nfreq = 0.2;
         let mut f = std::fs::File::create("./points.txt").unwrap();
-        
+
         writeln!(f, "129 129 129");
         (0..129).for_each(|i|{
             (0..129).for_each(|j|{
@@ -63,18 +63,18 @@ fn main() {
     }
 
     // Set up the necessary objects to deal with windows and event handling
-    let el = glutin::event_loop::EventLoop::new();
+    let event_loop = glutin::event_loop::EventLoop::new();
     let wb = glutin::window::WindowBuilder::new()
         .with_title("Marching Cubes")
         .with_resizable(false)
         .with_inner_size(glutin::dpi::LogicalSize::new(SCREEN_W, SCREEN_H));
     let cb = glutin::ContextBuilder::new()
         .with_vsync(true);
-    let windowed_context = cb.build_windowed(wb, &el).unwrap();
+    let windowed_context = cb.build_windowed(wb, &event_loop).unwrap();
     // Uncomment these if you want to use the mouse for controls, but want it to be confined to the screen and/or invisible.
     // windowed_context.window().set_cursor_grab(true).expect("failed to grab cursor");
     // windowed_context.window().set_cursor_visible(false);
-    
+
     // Set up a shared vector for keeping track of currently pressed keys
     let arc_pressed_keys = Arc::new(Mutex::new(Vec::<VirtualKeyCode>::with_capacity(10)));
     // Make a reference of this vector to send to the render thread
@@ -146,7 +146,7 @@ fn main() {
             let indices = m.indices;
             let normals = m.normals;
             let cube_ic = m.index_count;
-    
+
             //---------------------------------------------------------------------/
             // Set up VAO
             //---------------------------------------------------------------------/
@@ -154,7 +154,7 @@ fn main() {
                 let mut vao = 0;
                 gl::GenVertexArrays(1, &mut vao);
                 gl::BindVertexArray(vao);
-    
+
                 let mut ibo = 0;
                 gl::GenBuffers(1, &mut ibo);
                 gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ibo);
@@ -164,7 +164,7 @@ fn main() {
                     pointer_to_array(&indices) as *const _,
                     gl::STATIC_DRAW
                 );
-    
+
                 let mut vbo = 0;
                 gl::GenBuffers(1, &mut vbo);
                 gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
@@ -174,10 +174,10 @@ fn main() {
                     pointer_to_array(&vertices) as *const _,
                     gl::STATIC_DRAW
                 );
-    
+
                 gl::EnableVertexAttribArray(0);
                 gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
-    
+
                 let mut nbo = 0;
                 gl::GenBuffers(1, &mut nbo);
                 gl::BindBuffer(gl::ARRAY_BUFFER, nbo);
@@ -187,7 +187,7 @@ fn main() {
                     pointer_to_array(&normals) as *const _,
                     gl::STATIC_DRAW
                 );
-    
+
                 gl::EnableVertexAttribArray(1);
                 gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
                 (vao, m.index_count)
@@ -195,10 +195,10 @@ fn main() {
         }).collect::<Vec<_>>();
         eprintln!("VAOS: {:?}", chunks);
 
-        
+
         //let m = mc::mc_test();
 
-        
+
         let mut grid_vao = Vec::new();
         let mut grid_model_mat = Vec::new();
         let grid_ic = 36;
@@ -213,7 +213,7 @@ fn main() {
                         let mut vao = 0;
                         gl::GenVertexArrays(1, &mut vao);
                         gl::BindVertexArray(vao);
-            
+
                         let mut ibo = 0;
                         gl::GenBuffers(1, &mut ibo);
                         gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ibo);
@@ -223,7 +223,7 @@ fn main() {
                             pointer_to_array(&indices) as *const _,
                             gl::STATIC_DRAW
                         );
-            
+
                         let mut vbo = 0;
                         gl::GenBuffers(1, &mut vbo);
                         gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
@@ -233,10 +233,10 @@ fn main() {
                             pointer_to_array(&vertices) as *const _,
                             gl::STATIC_DRAW
                         );
-            
+
                         gl::EnableVertexAttribArray(0);
                         gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
-            
+
                         let mut nbo = 0;
                         gl::GenBuffers(1, &mut nbo);
                         gl::BindBuffer(gl::ARRAY_BUFFER, nbo);
@@ -246,7 +246,7 @@ fn main() {
                             pointer_to_array(&normals) as *const _,
                             gl::STATIC_DRAW
                         );
-            
+
                         gl::EnableVertexAttribArray(1);
                         gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
                         vao
@@ -254,7 +254,7 @@ fn main() {
                     grid_vao.push(vao);
                     grid_model_mat.push(
                         glm::translate(
-                            &glm::identity(), 
+                            &glm::identity(),
                             &glm::vec3(8.0+16.0*i as f32, 8.0+16.0*j as f32, 8.0+16.0*k as f32)
                         )
                     );
@@ -333,7 +333,7 @@ fn main() {
             }
             let mid = 32.0f32;
             let view_mat = glm::look_at(&glm::vec3(mid+mid*2.0*elapsed.cos(),mid*2.5,mid+mid*2.0*elapsed.sin()), &glm::vec3(mid,mid,mid), &glm::vec3(0.0, 1.0, 0.0));
-            
+
             let mvp: glm::TMat4<f32> = perspective_mat * view_mat;
 
             unsafe {
@@ -351,11 +351,11 @@ fn main() {
                 gl::Uniform1ui(u_screen_h, SCREEN_H);
                 gl::Uniform1f(u_mouse_x, mouse_pos.0);
                 gl::Uniform1f(u_mouse_y, mouse_pos.1);
-                
+
                 gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
                 gl::Disable(gl::CULL_FACE);
                 for (vao, ic) in chunks.iter() {
-                    
+
                     gl::Uniform4f(u_color, 1.0, 0.0, 1.0, 1.0);
                     gl::BindVertexArray(*vao);
                     gl::DrawElements(gl::TRIANGLES, *ic, gl::UNSIGNED_INT, std::ptr::null());
@@ -366,15 +366,15 @@ fn main() {
                     let mvp = mvp * model;
                     gl::UniformMatrix4fv(u_mvp, 1, gl::FALSE, mvp.as_ptr());
                     gl::Uniform4f(u_color, 0.0, 0.0, 0.0, 0.5);
-                    
+
                     gl::BindVertexArray(*vao);
                     gl::DrawElements(gl::TRIANGLES, grid_ic, gl::UNSIGNED_INT, std::ptr::null());
-                    
+
                 }
                 gl::Enable(gl::CULL_FACE);
-                
-                
-                
+
+
+
             }
 
             context.swap_buffers().unwrap();
@@ -394,7 +394,7 @@ fn main() {
     });
 
     // Start the event loop -- This is where window events get handled
-    el.run(move |event, _, control_flow| {
+    event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         // Terminate program if render thread panics
